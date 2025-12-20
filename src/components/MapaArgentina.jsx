@@ -56,7 +56,9 @@ const MapaArgentina = ({ datosMineros, provinciaSeleccionada, onProvinciaClick }
       mouseout: (e) => {
         if (datoMinero) {
            // Al salir el mouse, simplemente dejamos que el estilo base se encargue
-           e.target.setStyle({ fillOpacity: 0.6, weight: 1 });
+           // (Esto previene que se quede "trabado" el color)
+           const estilo = estiloProvincia(feature); 
+           layer.setStyle(estilo);
         }
       }
     });
