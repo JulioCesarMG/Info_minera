@@ -1,156 +1,72 @@
-import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, GeoJSON, LayersControl } from 'react-leaflet';
+import React from 'react';
+import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const { BaseLayer } = LayersControl;
+// Coordenadas fijas de las provincias (Latitud, Longitud)
+const COORDENADAS_PROVINCIAS = {
+  'Jujuy': [-23.0, -66.0],
+  'Salta': [-24.5, -66.0],
+  'Catamarca': [-27.0, -67.0],
+  'San Juan': [-31.0, -69.0],
+  'Santa Cruz': [-49.0, -70.0],
+  // Fallback para evitar errores si no encuentra la provincia
+  'default': [-40.0, -64.0]
+};
 
-const MapaArgentina = ({ onProvinciaClick, datosMineros, provinciaSeleccionada }) => {
-  const [geojsonData, setGeojsonData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const cargarGeojson = async () => {
-      try {
-        const response = await fetch('/api/georef/provincias.geojson');
-        if (!response.ok) {
-          throw new Error('Error al cargar el mapa');
-        }
-        const data = await response.json();
-        setGeojsonData(data);
-        setLoading(false);
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-
-    cargarGeojson();
-  }, []);
-
-  const obtenerDatosProvincia = (provinciaId) => {
-    if (!datosMineros || datosMineros.length === 0) return null;
-
-    const idNum = parseInt(provinciaId, 10);
-
-    return datosMineros.find(dato =>
-      parseInt(dato.id_mapa, 10) === idNum ||
-      parseInt(dato.id, 10) === idNum
+const MapaArgentina = ({ datosMineros, provinciaSeleccionada, onProvinciaClick }) => {
+  
+  const obtenerCoords = (nombreProvincia) => {
+    if (!nombreProvincia) return null;
+    // Busca si el nombre del Excel (ej: "San Juan (Offline)") contiene la clave (ej: "San Juan")
+    const clave = Object.keys(COORDENADAS_PROVINCIAS).find(key => 
+      nombreProvincia.includes(key)
     );
+    return COORDENADAS_PROVINCIAS[clave] || null;
   };
-
-  const estiloBase = (feature) => {
-    const esSeleccionada = provinciaSeleccionada?.id === feature.properties.id;
-
-    return {
-      fillColor: esSeleccionada ? '#F59E0B' : '#C9A882',
-      weight: esSeleccionada ? 3 : 2,
-      opacity: 1,
-      color: esSeleccionada ? '#F59E0B' : '#ffffff',
-      fillOpacity: 0.3
-    };
-  };
-
-  const onEachFeature = (feature, layer) => {
-    const nombreProvincia = feature.properties.nombre;
-
-    layer.bindTooltip(nombreProvincia, {
-      permanent: false,
-      direction: 'center',
-      className: 'provincia-tooltip'
-    });
-
-    layer.on({
-      mouseover: (e) => {
-        const esSeleccionada = provinciaSeleccionada?.id === feature.properties.id;
-        if (!esSeleccionada) {
-          e.target.setStyle({
-            fillColor: '#D4B896',
-            fillOpacity: 0.6
-          });
-        }
-      },
-      mouseout: (e) => {
-        e.target.setStyle(estiloBase(feature));
-      },
-      click: () => {
-        const datosProvincia = obtenerDatosProvincia(feature.properties.id);
-        onProvinciaClick({
-          id: feature.properties.id,
-          nombre: nombreProvincia,
-          datos: datosProvincia
-        });
-      }
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-azul-gob mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Cargando mapa...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full bg-red-50 rounded-lg">
-        <p className="text-red-600">Error: {error}</p>
-      </div>
-    );
-  }
 
   return (
-    <MapContainer
-      center={[-20, -65]}
-      zoom={3}
-      minZoom={3}
-      maxZoom={12}
-      style={{ height: '100%', width: '100%' }}
-      className="rounded-lg shadow-lg"
+    <MapContainer 
+      center={[-40.0, -64.0]} 
+      zoom={4} 
+      className="h-full w-full z-0" // Asegura que ocupe todo el espacio
+      scrollWheelZoom={true}
     >
-      <LayersControl position="topright">
-        <BaseLayer checked name="🗺️ Mapa Político">
-          <TileLayer
-            attribution='&copy; OpenStreetMap'
-            url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png"
-          />
-        </BaseLayer>
+      <TileLayer
+        attribution='&copy; OpenStreetMap'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
 
-        <BaseLayer name="🏔️ Mapa Físico">
-          <TileLayer
-            attribution='&copy; OpenTopoMap'
-            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
-            maxZoom={17}
-          />
-        </BaseLayer>
+      {datosMineros.map((dato, index) => {
+        const coords = obtenerCoords(dato.Provincia);
+        
+        // Si no hay coordenadas, saltamos esta provincia sin romper nada
+        if (!coords) return null;
 
-        <BaseLayer name="🏙️ Calles">
-          <TileLayer
-            attribution='&copy; OpenStreetMap'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-        </BaseLayer>
+        const esSeleccionada = provinciaSeleccionada && provinciaSeleccionada.id === dato.id;
 
-        <BaseLayer name="🛰️ Satélite">
-          <TileLayer
-            attribution='&copy; Esri'
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          />
-        </BaseLayer>
-      </LayersControl>
-
-      {geojsonData && (
-        <GeoJSON
-          data={geojsonData}
-          style={estiloBase}
-          onEachFeature={onEachFeature}
-          key={provinciaSeleccionada?.id}
-        />
-      )}
+        return (
+          <CircleMarker
+            key={index}
+            center={coords}
+            pathOptions={{
+              color: esSeleccionada ? '#b45309' : '#2563eb', 
+              fillColor: esSeleccionada ? '#d97706' : '#3b82f6',
+              fillOpacity: 0.7,
+              weight: esSeleccionada ? 3 : 2
+            }}
+            radius={esSeleccionada ? 15 : 10}
+            eventHandlers={{
+              click: () => onProvinciaClick(dato),
+              mouseover: (e) => e.target.openPopup(),
+              mouseout: (e) => e.target.closePopup()
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+              <span className="font-bold">{dato.Provincia}</span>
+            </Tooltip>
+          </CircleMarker>
+        );
+      })}
     </MapContainer>
   );
 };
