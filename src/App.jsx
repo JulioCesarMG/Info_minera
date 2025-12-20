@@ -114,7 +114,7 @@ function App() {
       <header className="bg-white px-4 py-2 shadow-sm z-50 flex justify-between items-center border-b shrink-0 h-14">
         <div>
           <h1 className="text-lg font-bold text-gray-800">
-            {idioma === 'es' ? '🇦🇷 Mapa Minero' : '🇦🇷 Mining Map'}
+            {idioma === 'es' ? '🇦🇷 Mapa Minero V2' : '🇦🇷 Mining Map'}
           </h1>
           <p className="text-[10px] text-gray-500 font-mono flex items-center gap-2">
              STATUS: <span className={`font-bold ${estadoConexion.includes('ONLINE') ? 'text-green-600' : 'text-orange-500'}`}>{estadoConexion}</span>
