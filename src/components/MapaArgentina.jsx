@@ -1,88 +1,155 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
+import { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, GeoJSON, LayersControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const MapaArgentina = ({ datosMineros, provinciaSeleccionada, onProvinciaClick }) => {
-  const [geoJsonData, setGeoJsonData] = useState(null);
+const { BaseLayer } = LayersControl;
 
-  // 1. CARGA DEL MAPA GEOMÉTRICO (MULTICAPA)
+const MapaArgentina = ({ onProvinciaClick, datosMineros, provinciaSeleccionada }) => {
+  const [geojsonData, setGeojsonData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
-    fetch('https://raw.githubusercontent.com/nexus-sun/argentina-geojson/master/provincias.json')
-      .then(response => response.json())
-      .then(data => setGeoJsonData(data))
-      .catch(err => console.error("Error al cargar mapa:", err));
+    const cargarGeojson = async () => {
+      try {
+        const response = await fetch('/api/georef/provincias.geojson');
+        if (!response.ok) {
+          throw new Error('Error al cargar el mapa');
+        }
+        const data = await response.json();
+        setGeojsonData(data);
+        setLoading(false);
+      } catch (err) {
+        setError(err.message);
+        setLoading(false);
+      }
+    };
+
+    cargarGeojson();
   }, []);
 
-  // 2. ESTILO DE LAS PROVINCIAS
-  const estiloProvincia = (feature) => {
-    const nombreGeo = feature.properties.nombre; // Ej: "Santa Cruz"
-    
-    // Verificamos si esta provincia está en tu Excel
-    const datoMinero = datosMineros.find(d => 
-      d.Provincia && d.Provincia.toLowerCase().includes(nombreGeo.toLowerCase())
-    );
+  const obtenerDatosProvincia = (provinciaId) => {
+    if (!datosMineros || datosMineros.length === 0) return null;
 
-    const esSeleccionada = provinciaSeleccionada && provinciaSeleccionada.id === datoMinero?.id;
-    const tieneDatos = !!datoMinero;
+    // Normalizar IDs: agregar cero a la izquierda si es necesario (formato: "02", "06", etc.)
+    const idBuscado = String(provinciaId).padStart(2, '0');
+
+    return datosMineros.find(dato => {
+      const idDato = String(dato.id_mapa || dato.id).padStart(2, '0');
+      return idDato === idBuscado;
+    });
+  };
+
+  const estiloBase = (feature) => {
+    const esSeleccionada = provinciaSeleccionada?.id === feature.properties.id;
 
     return {
-      fillColor: esSeleccionada ? '#d97706' : (tieneDatos ? '#2563eb' : '#cbd5e1'), // Naranja, Azul o Gris
-      weight: esSeleccionada ? 2 : 1,
+      fillColor: esSeleccionada ? '#F59E0B' : '#C9A882',
+      weight: esSeleccionada ? 3 : 2,
       opacity: 1,
-      color: 'white',
-      fillOpacity: esSeleccionada ? 0.8 : 0.6
+      color: esSeleccionada ? '#F59E0B' : '#ffffff',
+      fillOpacity: 0.3
     };
   };
 
-  // 3. CLICS Y EVENTOS
   const onEachFeature = (feature, layer) => {
-    const nombreGeo = feature.properties.nombre;
-    const datoMinero = datosMineros.find(d => 
-      d.Provincia && d.Provincia.toLowerCase().includes(nombreGeo.toLowerCase())
-    );
+    const nombreProvincia = feature.properties.nombre;
+
+    layer.bindTooltip(nombreProvincia, {
+      permanent: false,
+      direction: 'center',
+      className: 'provincia-tooltip'
+    });
 
     layer.on({
-      click: () => {
-        if (datoMinero) {
-          onProvinciaClick(datoMinero);
-        }
-      },
       mouseover: (e) => {
-        if (datoMinero) {
-          const layer = e.target;
-          layer.setStyle({ fillOpacity: 0.9, weight: 2 });
+        const esSeleccionada = provinciaSeleccionada?.id === feature.properties.id;
+        if (!esSeleccionada) {
+          e.target.setStyle({
+            fillColor: '#D4B896',
+            fillOpacity: 0.6
+          });
         }
       },
       mouseout: (e) => {
-        if (datoMinero) {
-           // Al salir el mouse, simplemente dejamos que el estilo base se encargue
-           // (Esto previene que se quede "trabado" el color)
-           const estilo = estiloProvincia(feature); 
-           layer.setStyle(estilo);
-        }
+        e.target.setStyle(estiloBase(feature));
+      },
+      click: () => {
+        const datosProvincia = obtenerDatosProvincia(feature.properties.id);
+        onProvinciaClick({
+          id: feature.properties.id,
+          nombre: nombreProvincia,
+          datos: datosProvincia
+        });
       }
     });
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-azul-gob mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Cargando mapa...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full bg-red-50 rounded-lg">
+        <p className="text-red-600">Error: {error}</p>
+      </div>
+    );
+  }
+
   return (
-    <MapContainer 
-      center={[-40.0, -64.0]} 
-      zoom={4} 
-      className="h-full w-full bg-slate-100"
-      scrollWheelZoom={true}
+    <MapContainer
+      center={[-40, -25]}      // Ajuste final - Argentina a la izquierda
+      zoom={4.5}               // Zoom óptimo
+      minZoom={4}
+      maxZoom={12}
+      style={{ height: '100%', width: '100%' }}
+      className="rounded-lg shadow-lg"
     >
-      {/* Mapa Base Estándar (El que funcionaba bien) */}
-      <TileLayer
-        attribution='&copy; OpenStreetMap'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      
-      {/* La capa de provincias (GeoJSON) */}
-      {geoJsonData && (
-        <GeoJSON 
-          data={geoJsonData} 
-          style={estiloProvincia} 
-          onEachFeature={onEachFeature} 
+      <LayersControl position="topright" collapsed={false}>
+        <BaseLayer checked name="🗺️ Mapa Político">
+          <TileLayer
+            attribution='&copy; OpenStreetMap'
+            url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png"
+          />
+        </BaseLayer>
+
+        <BaseLayer name="🏔️ Mapa Físico">
+          <TileLayer
+            attribution='&copy; OpenTopoMap'
+            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+            maxZoom={17}
+          />
+        </BaseLayer>
+
+        <BaseLayer name="🏙️ Calles">
+          <TileLayer
+            attribution='&copy; OpenStreetMap'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        </BaseLayer>
+
+        <BaseLayer name="🛰️ Satélite">
+          <TileLayer
+            attribution='&copy; Esri'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          />
+        </BaseLayer>
+      </LayersControl>
+
+      {geojsonData && (
+        <GeoJSON
+          data={geojsonData}
+          style={estiloBase}
+          onEachFeature={onEachFeature}
+          key={provinciaSeleccionada?.id}
         />
       )}
     </MapContainer>
