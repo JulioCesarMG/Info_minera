@@ -29,15 +29,25 @@ const MapaArgentina = ({ onProvinciaClick, datosMineros, provinciaSeleccionada }
   }, []);
 
   const obtenerDatosProvincia = (provinciaId) => {
-    if (!datosMineros || datosMineros.length === 0) return null;
+    console.log('🔍 Buscando datos para provincia ID:', provinciaId);
+    console.log('📊 Array de datos disponibles:', datosMineros);
 
-    // Normalizar IDs: agregar cero a la izquierda si es necesario (formato: "02", "06", etc.)
+    if (!datosMineros || datosMineros.length === 0) {
+      console.log('❌ No hay datos mineros disponibles');
+      return null;
+    }
+
     const idBuscado = String(provinciaId).padStart(2, '0');
+    console.log('🔢 ID normalizado buscado:', idBuscado);
 
-    return datosMineros.find(dato => {
+    const resultado = datosMineros.find(dato => {
       const idDato = String(dato.id_mapa || dato.id).padStart(2, '0');
+      console.log(`Comparando: ${idDato} === ${idBuscado}?`, idDato === idBuscado);
       return idDato === idBuscado;
     });
+
+    console.log('✅ Resultado encontrado:', resultado);
+    return resultado;
   };
 
   const estiloBase = (feature) => {
@@ -75,7 +85,14 @@ const MapaArgentina = ({ onProvinciaClick, datosMineros, provinciaSeleccionada }
         e.target.setStyle(estiloBase(feature));
       },
       click: () => {
+        console.log('🖱️ CLICK DETECTADO');
         const datosProvincia = obtenerDatosProvincia(feature.properties.id);
+        console.log('Datos encontrados:', datosProvincia);
+        console.log('Llamando onProvinciaClick con:', {
+          id: feature.properties.id,
+          nombre: nombreProvincia,
+          datos: datosProvincia
+        });
         onProvinciaClick({
           id: feature.properties.id,
           nombre: nombreProvincia,
@@ -106,8 +123,8 @@ const MapaArgentina = ({ onProvinciaClick, datosMineros, provinciaSeleccionada }
 
   return (
     <MapContainer
-      center={[-40, -25]}      // Ajuste final - Argentina a la izquierda
-      zoom={4.5}               // Zoom óptimo
+      center={[-40, -25]}
+      zoom={4.5}
       minZoom={4}
       maxZoom={12}
       style={{ height: '100%', width: '100%' }}

@@ -8,17 +8,35 @@ const PanelInformacion = ({ datos, nombreProvincia, onLimpiar, configTema, idiom
       fuente: 'Fuente',
       verEnlace: 'Abrir enlace oficial',
       cargando: 'Cargando información...',
-      clickNuevamente: 'Haz click nuevamente sobre la provincia para cargar los datos'
+      clickNuevamente: 'Haz click nuevamente sobre el MAPA DE LA PROVINCIA para visualizar los datos'
     },
     en: {
       sinDatos: 'No data available',
       fuente: 'Source',
       verEnlace: 'Open official link',
       cargando: 'Loading information...',
-      clickNuevamente: 'Click again on the province to load the data'
+      clickNuevamente: 'Click again on the PROVINCE MAP to view the data'
     }
   };
   const T = textos[idioma] || textos.es;
+
+  // Obtener el valor correcto según idioma (detecta automáticamente columnas _ES/_EN)
+  const obtenerValorBilingue = (key) => {
+    if (!datos) return null;
+
+    // Primero intenta con el sufijo del idioma (_ES o _EN)
+    const keyConIdioma = `${key}_${idioma.toUpperCase()}`;
+    if (datos[keyConIdioma] !== undefined && datos[keyConIdioma] !== null && datos[keyConIdioma] !== '') {
+      return datos[keyConIdioma];
+    }
+
+    // Si no existe con sufijo, usa la columna sin sufijo (para datos no bilingües como números)
+    if (datos[key] !== undefined && datos[key] !== null && datos[key] !== '') {
+      return datos[key];
+    }
+
+    return null;
+  };
 
   // Función para formatear los valores
   const formatear = (valor, formato) => {
@@ -49,7 +67,7 @@ const PanelInformacion = ({ datos, nombreProvincia, onLimpiar, configTema, idiom
 
     // Verificar si al menos un campo tiene datos reales
     return configTema.campos.some(campo => {
-      const valor = datos[campo.key];
+      const valor = obtenerValorBilingue(campo.key);
       return valor !== undefined && valor !== null && valor !== '' && valor !== 'Sin datos disponibles';
     });
   };
@@ -94,16 +112,19 @@ const PanelInformacion = ({ datos, nombreProvincia, onLimpiar, configTema, idiom
       {/* Lista de Datos */}
       {hayDatos && (
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {configTema.campos.map((campo, i) => (
-            <div key={i} className="border-b border-gray-100 pb-4 last:border-0">
-              <p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">
-                {campo.label[idioma]}
-              </p>
-              <div className="text-lg">
-                {formatear(datos[campo.key], campo.formato)}
+          {configTema.campos.map((campo, i) => {
+            const valor = obtenerValorBilingue(campo.key);
+            return (
+              <div key={i} className="border-b border-gray-100 pb-4 last:border-0">
+                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">
+                  {campo.label[idioma]}
+                </p>
+                <div className="text-lg">
+                  {formatear(valor, campo.formato)}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
