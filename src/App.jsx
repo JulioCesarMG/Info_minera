@@ -31,7 +31,8 @@ const TEMAS = {
             { label: { es: 'Empleo', en: 'Employment' }, key: 'Empleo_Total', formato: 'numero' },
             { label: { es: 'Exportaciones', en: 'Exports' }, key: 'Exportaciones_USD', formato: 'moneda' },
             { label: { es: 'Inversiones', en: 'Investments' }, key: 'Inversiones_USD', formato: 'moneda' },
-            { label: { es: 'Producción Anual', en: 'Annual Production' }, key: 'Produccion_Anual_Ton', formato: 'numero' }
+            { label: { es: 'Valor Producción Anual', en: 'Annual Production Value' }, key: 'Valor_Produccion_Anual_USD', formato: 'moneda' },
+            { label: { es: 'Actividad Minera', en: 'Mining Activity' }, key: 'Descripcion_Actividad', formato: 'texto' }
         ]
     },
     legislacion: {
@@ -95,7 +96,21 @@ const TEMAS = {
             { label: { es: 'Empresas', en: 'Companies' }, key: 'Empresas_Principales', formato: 'texto' },
             { label: { es: 'Inversión 2024', en: 'Investment 2024' }, key: 'Inversion_2024_USD', formato: 'moneda' }
         ]
-    }
+    },
+    dashboard: {
+    id: 'dashboard',
+    nombre: { es: 'Dashboard', en: 'Dashboard' },
+    icono: '📊',
+    estilos: {
+        border: 'border-purple-500',
+        bg: 'bg-purple-50',
+        text: 'text-purple-800',
+        borderButton: 'border-b-4 border-purple-500',
+        bgButton: 'bg-purple-50',
+        textButton: 'text-purple-800'
+    },
+    url: 'https://lookerstudio.google.com/embed/reporting/6f860c1c-7860-4607-bc91-4918207710d2/page/zuijF'
+}
 };
 
 function App() {
@@ -109,13 +124,20 @@ function App() {
     useEffect(() => {
         const cargarDatos = async () => {
             const gid = TEMAS[temaActivo].gid;
+            
+            // Si es el dashboard, no cargar datos de Sheets
+            if (temaActivo === 'dashboard') {
+                setEstadoConexion('DASHBOARD');
+                return;
+            }
+            
             if (!gid) {
                 setDatos(DATOS_LOCALES);
                 setEstadoConexion('OFFLINE (Modo Demo)');
                 return;
             }
             setLoading(true);
-            setProvinciaSeleccionada(null); // Limpiar provincia al cambiar tema
+            setProvinciaSeleccionada(null);
             try {
                 const url = `https://docs.google.com/spreadsheets/d/e/2PACX-1vTJSE4LsXAJn5i-OqMVzef2gxYgIFzv7cVvtiAn4bpk8vvqvTTgno_bAtS_gml3bzjui3os6s1dz_J8/pub?gid=${gid}&single=true&output=csv`;
                 const response = await fetch(url);
@@ -143,7 +165,6 @@ function App() {
         cargarDatos();
     }, [temaActivo]);
 
-    // Actualizar datos de provincia seleccionada cuando cambien los datos
     useEffect(() => {
         if (provinciaSeleccionada && datos.length > 0) {
             const idBuscado = String(provinciaSeleccionada.id).padStart(2, '0');
@@ -161,7 +182,6 @@ function App() {
 
     const temaConfig = TEMAS[temaActivo];
 
-    // Obtener datos actuales de la provincia seleccionada
     const getDatosProvinciaActual = () => {
         if (!provinciaSeleccionada || !datos.length) return null;
 
@@ -198,19 +218,49 @@ function App() {
 
             {/* ÁREA PRINCIPAL */}
             <div className="flex flex-1 overflow-hidden flex-row relative">
-                {/* COLUMNA IZQUIERDA: MAPA */}
-                <div className={`flex flex-col relative bg-white border-r border-gray-200 transition-all duration-500 ease-in-out ${provinciaSeleccionada ? 'w-full md:w-1/3' : 'w-full'}`}>
+                {/* COLUMNA IZQUIERDA: MAPA O DASHBOARD */}
+                <div className={`flex flex-col relative bg-white border-r border-gray-200 transition-all duration-500 ease-in-out ${provinciaSeleccionada && temaActivo !== 'dashboard' ? 'w-full md:w-1/3' : 'w-full'}`}>
                     {loading && <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 animate-pulse z-50"></div>}
 
                     <div className="flex-1 relative z-0">
-                        <MapaArgentina
-                            datosMineros={datos}
-                            provinciaSeleccionada={provinciaSeleccionada}
-                            onProvinciaClick={setProvinciaSeleccionada}
-                        />
+                       {temaActivo === 'dashboard' ? (
+    <div className="w-full h-full flex flex-col bg-gray-50">
+        {/* HEADER CON ESCUDO Y COLORES OFICIALES */}
+        <div className="bg-[#2B2D42] text-white px-6 py-4 flex items-center justify-between shrink-0 h-24">
+            <div className="flex items-center gap-4 h-full">
+                <img src="/Info_minera/img/escudo_nacional.png" alt="Escudo" className="h-full object-contain" />
+                <div>
+                    <h2 className="text-xl font-bold">ECONOMÍA MINERA ARGENTINA</h2>
+                    <p className="text-sm text-gray-300">Panorama Provincial</p>
+                </div>
+            </div>
+            <img src="/Info_minera/img/logo_mineria.png" alt="Secretaría Minería" className="h-full object-contain" />
+        </div>
+        
+        {/* DASHBOARD */}
+        <div className="flex-1 overflow-auto flex justify-center items-start p-4">
+            <iframe
+                src={temaConfig.url}
+                width="1400"
+                height="900"
+                frameBorder="0"
+                style={{ border: 0 }}
+                allowFullScreen
+                title="Dashboard Looker Studio"
+            ></iframe>
+        </div>
+    </div>
+) : (
+                            // MAPA NORMAL
+                            <MapaArgentina
+                                datosMineros={datos}
+                                provinciaSeleccionada={provinciaSeleccionada}
+                                onProvinciaClick={setProvinciaSeleccionada}
+                            />
+                        )}
                     </div>
 
-                    {/* Menú inferior - CORREGIDO CON CLASES COMPLETAS */}
+                    {/* Menú inferior */}
                     <div className="bg-white border-t p-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20 shrink-0">
                         <div className="flex justify-around gap-2">
                             {Object.values(TEMAS).map(tema => {
@@ -225,7 +275,7 @@ function App() {
                                         className={`flex-1 py-2 px-1 rounded-lg transition-all flex flex-col items-center ${activo
                                             ? `${tema.estilos.borderButton} ${tema.estilos.bgButton} ${tema.estilos.textButton}`
                                             : 'border-b-4 border-transparent text-gray-400 hover:bg-gray-50'
-                                            }`}
+                                        }`}
                                     >
                                         <span className="text-xl">{tema.icono}</span>
                                         <span className="text-[10px] md:text-xs font-bold uppercase mt-1">
@@ -239,7 +289,7 @@ function App() {
                 </div>
 
                 {/* COLUMNA DERECHA: PANEL DE INFORMACIÓN */}
-                {provinciaSeleccionada && (
+                {provinciaSeleccionada && temaActivo !== 'dashboard' && (
                     <div className="flex-1 bg-white shadow-xl z-40 flex flex-col h-full animate-fade-in overflow-hidden">
                         <PanelInformacion
                             datos={provinciaSeleccionada.datos}
